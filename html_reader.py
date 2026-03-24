@@ -3,7 +3,7 @@ import json
 from pathlib import Path
 
 
-def parse_html(html_file):
+def html2json(html_file, json_file):
     with open(html_file, 'r', encoding='utf-8') as f:
         soup = BeautifulSoup(f, 'html.parser')
 
@@ -35,14 +35,7 @@ def parse_html(html_file):
             if span:
                 result[current_pid]["abstract"] = span.text.strip()
 
-    return result
-
-if __name__ == "__main__":
-    HTML_folder = Path("html")
-    JSON_folder = Path("json")
-
-    file_name = "ICML2025.html"
-    data = parse_html(HTML_folder/file_name)
-    
-    with open(JSON_folder/file_name, "w") as json_file:
-        json.dump(data, json_file, indent=4)
+    with open(json_file, "w") as json_file:
+        json.dump(result, json_file, indent=4)
+        
+    return

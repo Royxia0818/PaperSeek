@@ -7,29 +7,16 @@ import shutil
 
 
 def sanitize_filename(filename):
-    """
-    清理文件名，移除或替换 Windows 非法字符，并限制长度。
-    """
-    # 1. 替换掉 Windows 文件名中的非法字符: \ / : * ? " < > |
-    # 我们将它们统一替换为下划线 _
     illegal_chars = r'[\\/:*?"<>|]'
     sanitized = re.sub(illegal_chars, '_', filename)
-    
-    # 2. (可选但推荐) 移除其他可能引起混淆的特殊符号，如 $ ^ 等
-    # 如果只想保留 字母、数字、中文、下划线、空格、连字符(-) 和点(.)
-    # 下面的正则会保留这些字符，移除其他所有字符
-    # 注意：\u4e00-\u9fff 是中文范围
+
     sanitized = re.sub(r'[^\w\u4e00-\u9fff\s\-.]', '', sanitized)
     
-    # 3. 去除首尾的空格和点 (Windows 不允许文件名以点或空格结尾)
     sanitized = sanitized.strip().strip('.')
     
-    # 4. 如果文件名为空（例如原标题全是特殊字符），给一个默认名
     if not sanitized:
         sanitized = "unnamed_paper"
         
-    # 5. 限制文件名长度 (Windows 路径最大 260 字符，文件名建议不超过 255)
-    # 预留 .pdf 后缀的长度
     max_length = 250 
     if len(sanitized) > max_length:
         sanitized = sanitized[:max_length]
@@ -42,7 +29,6 @@ def download_pdf(url, save_path=None):
     """
     try:
         print(f"正在下载: {url}")
-        # 添加 User-Agent 防止被某些网站拦截
         headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36'}
         response = requests.get(url, stream=True, timeout=10, headers=headers)
         
@@ -78,15 +64,11 @@ def download_pdf(url, save_path=None):
         return False
 
 
-if __name__ == "__main__":
-    # 建议加上 encoding='utf-8' 防止中文乱码
-    with open("results.json", "r", encoding='utf-8') as json_file:
+def download_json(json_file, output_folder):
+    with open(json_file, "r", encoding='utf-8') as json_file:
         data = json.load(json_file)
     
-    output_folder = Path("Downloads")
-    if output_folder.exists():
-        shutil.rmtree(output_folder)
-    output_folder.mkdir(parents=True, exist_ok=False)
+    output_folder.mkdir(parents=True, exist_ok=True)
 
     success_count = 0
     fail_count = 0
@@ -95,15 +77,10 @@ if __name__ == "__main__":
         paper_href = paper_data["href"]
         paper_title = paper_data["title"]
         
-        # 【关键修改】清理文件名
         safe_title = sanitize_filename(paper_title)
         
         # 构建完整路径
         save_path = output_folder / f"{safe_title}.pdf"
-        
-        # 如果文件名过长导致路径超过 Windows 限制，Path 可能会报错，
-        # 但 sanitize_filename 已经限制了文件名长度，通常能避免这个问题。
-        
         print(f"处理论文: {paper_title[:30]}... -> {safe_title[:30]}...")
         
         if download_pdf(paper_href, save_path):

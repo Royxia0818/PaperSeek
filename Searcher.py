@@ -1,11 +1,11 @@
 import json
 
 
-def filter_titles(papers_dict):
-    new_dict = {}
+def json2result(json_file, result_file, keywords=["multimodal", "interaction"]):
+    with open(json_file, "r") as src_file:
+        papers_dict = json.load(src_file)
     
-    # 定义需要同时存在的关键词列表
-    keywords = ["multimodal", "interaction"]
+    new_dict = {}
 
     for pid, info in papers_dict.items():
         title = info.get("title", "")
@@ -15,15 +15,8 @@ def filter_titles(papers_dict):
         if all(keyword in title_lower for keyword in keywords):
             new_dict[pid] = info
 
-    return new_dict
+    with open(result_file, "w") as tgt_file:
+        json.dump(new_dict, tgt_file, indent=4)
 
-
-if __name__ == "__main__":
-    with open("json/CVPR2025.json", "r") as json_file:
-        data = json.load(json_file)
-    
-    filtered_data = filter_titles(data)
-    print(f"已筛选出{len(filtered_data)}条数据。")
-    
-    with open("results.json", "w") as json_file:
-        json.dump(filtered_data, json_file, indent=4)
+        
+    return 
