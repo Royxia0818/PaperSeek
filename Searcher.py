@@ -1,7 +1,7 @@
 import json
 
 
-def json2result(json_file, result_file, keywords=["multimodal", "interaction"]):
+def json2result(json_file, result_file, keywords=["modal", "interaction"]):
     with open(json_file, "r") as src_file:
         papers_dict = json.load(src_file)
     

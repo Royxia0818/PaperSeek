@@ -3,3 +3,5 @@ json/
 result/
 Downloads/
 .vscode/
+*.docx
+*.md
