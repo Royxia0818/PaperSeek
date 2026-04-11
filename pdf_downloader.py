@@ -90,3 +90,13 @@ def download_json(json_file, output_folder):
 
     print("-" * 30)
     print(f"下载完成! 成功: {success_count}, 失败: {fail_count}")
+
+
+if __name__ == "__main__":
+    output_folder = Path("Downloads")
+    result_file = Path("result.json")
+
+    if output_folder.is_dir():
+        shutil.rmtree(output_folder)
+
+    download_json(result_file, Path("Downloads"))
