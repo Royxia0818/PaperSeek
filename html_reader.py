@@ -9,7 +9,7 @@ def html2json(html_file, json_file, watermark=""):
 
     result = {}
 
-    if html_file.stem in ["ICML2025", "ICLR2025"]:
+    if html_file.stem in ["ICML2025", "ICLR2025", "AAAI2025", "SIGGraph2025"]:
         divs = soup.find_all("div")
         current_pid = None
 
@@ -31,7 +31,7 @@ def html2json(html_file, json_file, watermark=""):
                 if abs_span:
                     result[current_pid]["abstract"] = abs_span.text.strip()
         
-    elif html_file.stem in ["ICCV2025"]:
+    elif html_file.stem in ["ICCV2025", "CVPR2025"]:
         divs = soup.find_all("div")
         current_pid = None
         
@@ -87,4 +87,4 @@ def html2json(html_file, json_file, watermark=""):
 
 
 if __name__ == "__main__":
-    print(html2json(Path("html/ICCV2025.html"), Path("json/ICCV2025.json")))
+    print(html2json(Path("html/CVPR2025.html"), Path("json/CVPR2025.json")))
