@@ -11,106 +11,27 @@ json_folder = Path("json")
 result_folder = Path("result")
 
 
-# 目标主题：注意力头之间、模态之间、或注意力头与模态之间的关系。
-# 检索逻辑会在 title + abstract 中寻找这些概念，并进一步标注关系类型。
-ENTITY_TERMS = {
-    "attention_head": [
-        "attention head",
-        "attention heads",
-        "multi-head attention",
-        "multi head attention",
-        "head-specific",
-        "head specific",
-        "heads",
-    ],
-    "modality": [
-        "modality",
-        "modalities",
-        "multimodal",
-        "multi-modal",
-        "cross-modal",
-        "cross modal",
-        "unimodal",
-        "audio-visual",
-        "vision-language",
-        "visual-language",
-        "vision language",
-        "visual language",
-    ],
-}
-
-
-RELATION_TYPES = {
-    "redundancy": [
-        "redundan",
-        "overlap",
-        "duplicate",
-        "prune",
-        "pruning",
-        "mask",
-        "masking",
-        "suppress",
-        "suppressing",
-        "unimportant",
-        "not all",
-        "only .* heads",
-        "head selection",
-        "selective",
-        "sparse",
-    ],
-    "collaboration": [
-        "collaborat",
-        "cooperat",
-        "synerg",
-        "interact",
-        "interaction",
-        "fusion",
-        "fuse",
-        "joint",
-        "complement",
-        "mutual",
-        "cross-modal",
-        "cross modal",
-        "aggregate",
-        "aggregated",
-    ],
-    "expert": [
-        "expert",
-        "mixture-of-experts",
-        "mixture of experts",
-        "mixture-of-head",
-        "mixture of head",
-        "speciali",
-        "specialized",
-        "specialization",
-        "route",
-        "routing",
-        "select .* heads",
-        "token .* select",
-        "functional pathway",
-        "task-specific",
-        "modality-specific",
-        "head-specific",
-    ],
-    "interference": [
-        "interfer",
-        "conflict",
-        "compete",
-        "competition",
-        "negative transfer",
-        "imbalance",
-        "disproportion",
-        "suppress",
-        "collapse",
-        "hinder",
-        "degrade",
-        "harm",
-        "bias",
-        "dominant modality",
-        "weak modality",
-        "strong modality",
-    ],
-}
+# 目标主题：SVD 分解及其相关表达。
+# 检索逻辑会在 title + abstract 中寻找这些关键词。
+SVD_TERMS = [
+    r"\bsvd\b",
+    r"singular value decomposition",
+    r"singular-value decomposition",
+    r"singular value decompos\w*",
+    r"singular-value decompos\w*",
+    r"singular values?",
+    r"singular vectors?",
+    r"truncated svd",
+    r"randomized svd",
+    r"thin svd",
+    r"compact svd",
+    r"partial svd",
+    r"rank-revealing svd",
+    r"low-rank approximation",
+    r"low rank approximation",
+    r"low-rank decompos\w*",
+    r"low rank decompos\w*",
+]
 
 
 def normalize_text(*parts):
@@ -149,7 +70,7 @@ def make_snippets(text, patterns, window=90, limit=3):
     return snippets
 
 
-def classify_relation_papers(json_file, result_file):
+def search_svd_papers(json_file, result_file):
     with open(json_file, "r", encoding="utf-8") as src_file:
         papers = json.load(src_file)
 
@@ -159,35 +80,12 @@ def classify_relation_papers(json_file, result_file):
         abstract = info.get("abstract", "")
         text = normalize_text(title, abstract)
 
-        entity_hits = {
-            name: matched_patterns(text, terms)
-            for name, terms in ENTITY_TERMS.items()
-        }
-        entity_hits = {name: hits for name, hits in entity_hits.items() if hits}
-
-        if not entity_hits:
+        matched_terms = matched_patterns(text, SVD_TERMS)
+        if not matched_terms:
             continue
-
-        relation_hits = {
-            name: matched_patterns(text, terms)
-            for name, terms in RELATION_TYPES.items()
-        }
-        relation_hits = {name: hits for name, hits in relation_hits.items() if hits}
-
-        # 必须能明确归到至少一种关系类型，避免只命中泛泛的 attention/multimodal 论文。
-        if not relation_hits:
-            continue
-
-        matched_terms = []
-        for hits in entity_hits.values():
-            matched_terms.extend(hits)
-        for hits in relation_hits.values():
-            matched_terms.extend(hits)
 
         enriched_info = dict(info)
-        enriched_info["matched_entities"] = sorted(entity_hits)
-        enriched_info["matched_relation_types"] = sorted(relation_hits)
-        enriched_info["matched_terms"] = sorted(set(matched_terms))
+        enriched_info["matched_svd_terms"] = sorted(set(matched_terms))
         enriched_info["match_snippets"] = make_snippets(
             f"{title}\n{abstract}",
             matched_terms,
@@ -215,9 +113,9 @@ for json_file in json_folder.iterdir():
     if json_file.suffix.lower() != ".json":
         continue
     result_file = result_folder / json_file.name
-    matches = classify_relation_papers(json_file, result_file)
+    matches = search_svd_papers(json_file, result_file)
     total += len(matches)
     print(f"Searched {json_file}: {len(matches)} matches")
 
 merged = conclude(result_folder)
-print(f"Total relation papers: {len(merged)}")
+print(f"Total SVD-related papers: {len(merged)}")
