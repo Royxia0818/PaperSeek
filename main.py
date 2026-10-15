@@ -11,26 +11,20 @@ json_folder = Path("json")
 result_folder = Path("result")
 
 
-# 目标主题：SVD 分解及其相关表达。
+# 目标主题：模型编辑，以及知识编辑、事实编辑等相关表达。
 # 检索逻辑会在 title + abstract 中寻找这些关键词。
-SVD_TERMS = [
-    r"\bsvd\b",
-    r"singular value decomposition",
-    r"singular-value decomposition",
-    r"singular value decompos\w*",
-    r"singular-value decompos\w*",
-    r"singular values?",
-    r"singular vectors?",
-    r"truncated svd",
-    r"randomized svd",
-    r"thin svd",
-    r"compact svd",
-    r"partial svd",
-    r"rank-revealing svd",
-    r"low-rank approximation",
-    r"low rank approximation",
-    r"low-rank decompos\w*",
-    r"low rank decompos\w*",
+MODEL_EDITING_TERMS = [
+    r"\bmodel[\s-]+edit(?:ing|s|ed|ors?)?\b",
+    r"\bknowledge[\s-]+edit(?:ing|s|ed|ors?)?\b",
+    r"\bfact(?:ual)?[\s-]+edit(?:ing|s|ed|ors?)?\b",
+    r"\b(?:language[\s-]+models?|llms?)[\s-]+edit(?:ing|s|ed|ors?)?\b",
+    r"\bedit(?:ing|s|ed)?\s+(?:(?:the|a|an)\s+)?"
+    r"(?:(?:large|pre[\s-]?trained|neural|language|multimodal|vision[\s-]+language)\s+)*models?\b",
+    r"\bedit(?:ing|s|ed)?\s+(?:(?:the|a|an)\s+)?llms?\b",
+    r"\bedit(?:ing|s|ed)?\s+(?:factual\s+)?knowledge\b",
+    r"模型编辑",
+    r"知识编辑",
+    r"事实编辑",
 ]
 
 
@@ -70,7 +64,7 @@ def make_snippets(text, patterns, window=90, limit=3):
     return snippets
 
 
-def search_svd_papers(json_file, result_file):
+def search_model_editing_papers(json_file, result_file):
     with open(json_file, "r", encoding="utf-8") as src_file:
         papers = json.load(src_file)
 
@@ -80,12 +74,12 @@ def search_svd_papers(json_file, result_file):
         abstract = info.get("abstract", "")
         text = normalize_text(title, abstract)
 
-        matched_terms = matched_patterns(text, SVD_TERMS)
+        matched_terms = matched_patterns(text, MODEL_EDITING_TERMS)
         if not matched_terms:
             continue
 
         enriched_info = dict(info)
-        enriched_info["matched_svd_terms"] = sorted(set(matched_terms))
+        enriched_info["matched_model_editing_terms"] = sorted(set(matched_terms))
         enriched_info["match_snippets"] = make_snippets(
             f"{title}\n{abstract}",
             matched_terms,
@@ -113,9 +107,9 @@ for json_file in json_folder.iterdir():
     if json_file.suffix.lower() != ".json":
         continue
     result_file = result_folder / json_file.name
-    matches = search_svd_papers(json_file, result_file)
+    matches = search_model_editing_papers(json_file, result_file)
     total += len(matches)
     print(f"Searched {json_file}: {len(matches)} matches")
 
 merged = conclude(result_folder)
-print(f"Total SVD-related papers: {len(merged)}")
+print(f"Total model-editing-related papers: {len(merged)}")
