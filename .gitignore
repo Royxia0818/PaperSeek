@@ -1,8 +1,14 @@
 html/
 json/
-result/
 Downloads/
 .vscode/
 *.docx
 *.md
+!/README.md
 *.json
+jev_result/
+search_result/
+download/
+jev/.venv
+jev/models
+jev/runtime

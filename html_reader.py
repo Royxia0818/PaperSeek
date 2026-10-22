@@ -87,4 +87,4 @@ def html2json(html_file, json_file, watermark=""):
 
 
 if __name__ == "__main__":
-    print(html2json(Path("html/CVPR2026.html"), Path("json/CVPR2026.json")))
+    print(html2json(Path("html/ECCV2026.html"), Path("json/ECCV2026.json")))

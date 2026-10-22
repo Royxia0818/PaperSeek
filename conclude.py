@@ -1,18 +1,34 @@
 from pathlib import Path
 import json
 
-def conclude(result_folder:Path = Path("result")):
+ROOT = Path(__file__).resolve().parent
+FILTER_FIELDS = {"match_snippets", "jev_topic", "jev_yes_probability"}
+
+
+def conclude(result_folder: Path = ROOT / "jev_result", result_file: Path = ROOT / "result.json"):
+    result_folder, result_file = Path(result_folder), Path(result_file)
     result = {}
     
-    for result_file in result_folder.iterdir():
-        if result_file.suffix.lower() != ".json":
+    if not result_folder.is_dir():
+        raise FileNotFoundError(f"Jev results directory not found: {result_folder}")
+    files = sorted(result_folder.glob("*.json"))
+    for index, source in enumerate(files, 1):
+        if source.resolve() == result_file.resolve():
             continue
-        with open(result_file, "r", encoding="utf-8") as json_file:
+        with source.open("r", encoding="utf-8") as json_file:
             new_data = json.load(json_file)
-        result.update(new_data)
+        for pid, info in new_data.items():
+            result[pid] = {key: value for key, value in info.items() if key not in FILTER_FIELDS}
+        print(f"[Merge {index}/{len(files)}] {source.name}: {len(new_data)} papers", flush=True)
 
-    with open("result.json", "w", encoding="utf-8") as json_file:
-        json.dump(result, json_file, indent=4, ensure_ascii=False)
+    result_file.parent.mkdir(parents=True, exist_ok=True)
+    temporary = result_file.with_name(result_file.name + ".tmp")
+    try:
+        temporary.write_text(json.dumps(result, indent=4, ensure_ascii=False), encoding="utf-8")
+        temporary.replace(result_file)
+    finally:
+        temporary.unlink(missing_ok=True)
+    print(f"Merged {len(result)} papers -> {result_file}", flush=True)
     
     return result
 
