@@ -1,6 +1,7 @@
 from bs4 import BeautifulSoup
 import json
 from pathlib import Path
+from urllib.parse import urlsplit, urlunsplit
 
 
 def html2json(html_file, json_file, watermark=""):
@@ -9,7 +10,45 @@ def html2json(html_file, json_file, watermark=""):
 
     result = {}
 
-    if html_file.stem in ["ICML2025", "ICLR2025", "AAAI2025", "SIGGraph2025"]:
+    if html_file.stem.upper().startswith(("NIPS", "NEURIPS")):
+        current_pid = None
+        for div in soup.find_all("div"):
+            if div.get("id") == "section":
+                pid_tag = div.find("span", id="pid")
+                current_pid = None
+                if not pid_tag:
+                    continue
+                current_pid = watermark + "_" + pid_tag.get_text().strip().replace(",", "")
+                result[current_pid] = {}
+                arxiv_pdf_fallback = ""
+                for link in div.find_all("a", href=True):
+                    href = link["href"].strip()
+                    parsed = urlsplit(href)
+                    if parsed.hostname not in {"arxiv.org", "www.arxiv.org"}:
+                        continue
+                    if parsed.path.startswith("/abs/") and parsed.path[5:]:
+                        result[current_pid]["href"] = href
+                        break
+                    if parsed.path.startswith("/pdf/") and parsed.path[5:]:
+                        identifier = parsed.path[5:]
+                        if identifier.endswith(".pdf"):
+                            identifier = identifier[:-4]
+                        arxiv_pdf_fallback = urlunsplit(parsed._replace(path="/abs/" + identifier))
+                if not result[current_pid].get("href") and arxiv_pdf_fallback:
+                    result[current_pid]["href"] = arxiv_pdf_fallback
+            elif div.get("id") == "title" and current_pid:
+                title_link = div.find("a")
+                if title_link:
+                    result[current_pid]["title"] = title_link.get_text().strip()
+                    # Keep the arXiv URL found in this paper's section header.
+                    if not result[current_pid].get("href"):
+                        result[current_pid]["href"] = title_link.get("href", "").strip()
+            elif div.get("id") == "abs" and current_pid:
+                abstract = div.find("span", id="abs")
+                if abstract:
+                    result[current_pid]["abstract"] = abstract.get_text().strip()
+
+    elif html_file.stem in ["ICML2025", "ICLR2025", "AAAI2025", "SIGGraph2025"]:
         divs = soup.find_all("div")
         current_pid = None
 

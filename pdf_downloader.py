@@ -21,7 +21,7 @@ def sanitize_filename(filename):
 
 
 def pdf_url(url):
-    """Change only OpenReview's /forum path; preserve ID and query parameters."""
+    """Convert OpenReview forum/arXiv abstract URLs to PDF URLs, preserving IDs."""
     if not isinstance(url, str) or not url.strip():
         raise ValueError('Missing paper href')
     url = url.strip()
@@ -31,6 +31,8 @@ def pdf_url(url):
     host = parts.hostname.lower()
     if (host == 'openreview.net' or host.endswith('.openreview.net')) and parts.path.rstrip('/') == '/forum':
         parts = parts._replace(path='/pdf')
+    elif host in ('arxiv.org', 'www.arxiv.org') and parts.path.startswith('/abs/'):
+        parts = parts._replace(path='/pdf/' + parts.path[len('/abs/'):])
     return urlunsplit(parts)
 
 

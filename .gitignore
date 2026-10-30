@@ -12,3 +12,4 @@ download/
 jev/.venv
 jev/models
 jev/runtime
+save/

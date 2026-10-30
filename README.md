@@ -1,6 +1,6 @@
 # 论文检索与本地 Jev 筛选
 
-从会议论文列表 HTML 中提取标题、摘要和链接，先用正则表达式筛选候选，再用本地 Jev 模型判断论文是否属于 **interpretability for model editing**，保留 `P(yes) > 0.5` 的文章，最后合并结果并按会议下载 PDF。
+从会议论文列表 HTML 中提取标题、摘要和链接，先用正则表达式筛选候选，再用本地 Jev 模型判断论文是否属于 **interpretability for model editing**，按 `searcher.py` 中的 `THRESHOLD` 保留文章（当前为 `P(yes) > 0.7`），最后合并结果并按会议下载 PDF。批量检索默认只处理文件名含 `26` 的文件。
 
 HTML 数据来源于 [CV Paper Portal](https://hongsong-wang.github.io/CV_Paper_Portal/)。`jev/` 目录引用上游 [feder-cr/jev](https://github.com/feder-cr/jev)，并包含本项目添加的 Python 本地调用接口。数据来源与版权说明见文末[致谢](#致谢)。
 
@@ -40,7 +40,7 @@ CV Paper Portal 的会议页面（手动保存 HTML）
 │   └── CVPR2026.json
 ├── search_result/              # 正则筛选后的候选论文
 │   └── CVPR2026.json
-├── jev_result/                 # P(yes) > 0.5 的论文
+├── jev_result/                 # P(yes) > THRESHOLD 的论文
 │   └── CVPR2026.json
 ├── result.json                 # 合并 jev_result/ 中所有 JSON
 ├── download/
@@ -146,20 +146,37 @@ New-Item -ItemType Directory -Force .\html | Out-Null
 
 程序不会自动从 Portal 下载 HTML；`html_reader.py` 读取的是本地保存的文件。
 
+NIPS / NeurIPS 页面优先使用当前论文编号所在行的 arXiv `/abs/` 链接作为 `href`，例如 `https://arxiv.org/abs/2605.30332`，不会被标题上的 OpenReview 链接覆盖。该行只有 arXiv PDF 链接时会转换为 `/abs/` 保存；没有 arXiv 链接时回退到标题链接。
+
 ## 5. 运行完整筛选流程
 
 ```powershell
 .\jev\.venv\Scripts\python.exe .\main.py
 ```
 
+默认只处理文件名中含 `26` 的会议。可指定年份或进度打印间隔：
+
+```powershell
+# 2025 年；也可写 --year 25
+.\jev\.venv\Scripts\python.exe .\main.py --year 2025
+
+# 所有年份
+.\jev\.venv\Scripts\python.exe .\main.py --year all
+
+# 2026 年，每完成 50 篇 Jev 判断打印一次进度
+.\jev\.venv\Scripts\python.exe .\main.py --year 2026 --progress-every 50
+```
+
+两位和四位年份都会转换为末两位，按文件名主体是否包含该字符串筛选；`all` 关闭年份筛选。
+
 当前 `main.py` 的执行顺序为：
 
-1. 解析 `html/` 中全部 `.html`、`.htm` 文件，写入 `json/`。
-2. 遍历 `json/` 中所有现有 JSON，进行正则匹配，写入 `search_result/`。
+1. 解析 `html/` 中符合所选年份的 `.html`、`.htm` 文件，写入 `json/`。
+2. 遍历 `json/` 中符合所选年份的现有 JSON，进行正则匹配，写入 `search_result/`。
 3. 首次遇到候选文章时加载 GPU 模型，并在各会议间复用，写入 `jev_result/`。
-4. 调用 `conclude.py`，合并 `jev_result/` 中所有 JSON 到 `result.json`。
+4. 调用 `conclude.py`，合并 `jev_result/` 中符合所选年份的 JSON 到 `result.json`。
 
-该入口处理全部现有会议 JSON，不只处理本次新保存的 HTML。筛选结果按同名文件更新；PDF 不会在这个步骤中自动下载。
+该入口处理所选年份的全部现有会议 JSON，不只处理本次新保存的 HTML。筛选结果按同名文件更新；PDF 不会在这个步骤中自动下载。
 
 ## 6. 单独处理一个文件或四个指定会议
 
@@ -186,7 +203,14 @@ run_research(
 
 默认 `use_jev=True`，会先检查正则，再进行模型判断。因此也可以直接将 `json/NIPS2026.json` 作为输入，但这一次调用只写指定的一个输出文件，不会额外生成正则结果或执行合并。
 
-当前 `searcher.py` 末尾的直接运行示例处理 ICML2026、NIPS2026、CVPR2026、ECCV2026 四个已有候选文件；需要更换会议时，修改对应调用，或使用下面的显式批量示例。
+直接运行 `searcher.py` 会遍历 `search_result/` 中符合年份条件的候选文件，复用一个模型，将结果写入 `jev_result/`；不执行合并。默认年份为 `26`，同样支持 `--year 2025`、`--year all` 和 `--progress-every 20`。
+
+```powershell
+# 已有正则结果，只运行 Jev 筛选
+.\jev\.venv\Scripts\python.exe .\searcher.py --year 2026
+```
+
+显式调用 `run_research(input_file, output_file)` 时，处理的是指定文件，不额外检查文件名年份。
 
 ### 6.2 只处理 NIPS2026、ICML2026、CVPR2026、ECCV2026
 
@@ -228,14 +252,16 @@ conclude()
 |---|---|
 | 正则 | 在标题和摘要中匹配 `\binterpret\w*\b`，忽略大小写 |
 | Jev | 判断论文是否将可解释性用于理解、定位、解释、指导或评价模型编辑 |
-| 保留阈值 | `P(yes) > 0.5`，恰好等于 0.5 时不保留 |
+| 保留阈值 | `P(yes) > THRESHOLD`；当前 `THRESHOLD = 0.7`，恰好等于阈值时不保留 |
 | 输出 | 保留论文记录，去掉 `match_snippets`、`jev_topic`、`jev_yes_probability` |
 
-要修改检索主题，编辑 `searcher.py` 中的 `INTERPRETABILITY_TERMS` 和 `JEV_QUESTION`；要调整阈值，修改 `keep = probability > 0.5`。正则是进入模型判断的前置条件：只出现其他同义表达、没有匹配该词族的论文不会进入 Jev，模型结果也需要结合实际论文复核。
+要修改检索主题，编辑 `searcher.py` 中的 `INTERPRETABILITY_TERMS` 和 `JEV_QUESTION`；要调整阈值，修改 `THRESHOLD`。正则是进入模型判断的前置条件：只出现其他同义表达、没有匹配该词族的论文不会进入 Jev，模型结果也需要结合实际论文复核。
 
-运行时会打印字段扫描数量、候选数量、当前论文 ID、`P(yes)`、`KEEP` / `DROP`、耗时和预计剩余时间。概率显示在终端，不写入最终论文记录。
+如果希望任意标题、摘要都通过正则初筛，改为 `INTERPRETABILITY_TERMS = [r"[\s\S]*"]`。该表达式匹配任意字符（包括换行和空文本）；匹配对象仍是标题与摘要拼接后的文本，不会遍历其他 JSON 字段。
 
-对于已知的摘要拼接问题，筛选器会识别后续文章的 `Paperid / Authors / Title` 标记并清理相应尾部。完整提示超过模型的 8192 token 限制时，会打印 `TRUNCATE`，将用于推理的摘要逐次减半后重试；标题、判断问题保持完整，结果中不会用这一推理截断版本替换摘要。此时判断依据只是截断后的内容。
+Jev 默认每完成 20 篇判断打印一次进度，并在当前文件完成时打印最后一次，例如 `Jev 20/1000 | kept=5 | truncated=1`。不再逐篇打印标题、概率和保留/排除结果。单文件函数可通过 `progress_every=50` 修改间隔，批量命令使用 `--progress-every 50`。
+
+对于已知的摘要拼接问题，筛选器会识别后续文章的 `Paperid / Authors / Title` 标记并清理相应尾部。完整提示超过模型的 8192 token 限制时，将用于推理的摘要逐次减半后重试，并在进度中的 `truncated` 统计已截断论文数；标题、判断问题保持完整，结果中不会用这一推理截断版本替换摘要。此时判断依据只是截断后的内容。
 
 如需使用已准备好的 CPU OpenVINO 模型，可显式调用 `run_research(..., device="cpu")`；`main.py` 的批量入口当前固定使用 CUDA。
 
@@ -245,7 +271,7 @@ conclude()
 .\jev\.venv\Scripts\python.exe .\conclude.py
 ```
 
-该命令不调用模型，只读取 `jev_result/*.json`，按论文 ID 合并到 `result.json`。同一 ID 重复时，按文件名排序后较晚读取的记录覆盖先前记录。合并时会去掉三个辅助字段，即使输入是历史版本生成的带辅助字段记录也会清理；原 `jev_result/` 文件不会被改写。
+该独立命令不调用模型，默认读取 `jev_result/*.json` 的全部年份，按论文 ID 合并到 `result.json`。`main.py` 会把所选年份传给合并函数；显式 Python 调用也可使用 `conclude(year="26")`。同一 ID 重复时，按文件名排序后较晚读取的记录覆盖先前记录。合并时会去掉三个辅助字段，即使输入是历史版本生成的带辅助字段记录也会清理；原 `jev_result/` 文件不会被改写。
 
 ## 8. 按会议下载 PDF
 
@@ -275,7 +301,7 @@ https://openreview.net/forum?id=jqykrG5xAb
 https://openreview.net/pdf?id=jqykrG5xAb
 ```
 
-只转换 OpenReview 的 `/forum` 路径，保留 ID 和其他查询参数，不修改输入 JSON。其他网站的链接按原地址请求。
+对于 OpenReview，转换 `/forum` 路径，保留 ID 和其他查询参数；对于 arXiv，将 `/abs/2605.30332` 转为 `/pdf/2605.30332` 后下载。转换只用于请求 PDF，不修改输入 JSON 中的 `href`；其他网站的链接按原地址请求。
 
 已有且带有 PDF 文件标识的目标文件会跳过；新文件先写 `.part`，检查 PDF 标识和响应长度后再保存。下载器打印逐篇进度和成功、跳过、失败统计；可重试的网络错误默认最多尝试 3 次，单次 socket 超时默认 60 秒。403、404 或返回 HTML 的链接会报告失败并继续处理其他文章。
 
